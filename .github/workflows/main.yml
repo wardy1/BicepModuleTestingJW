@@ -47,6 +47,7 @@ jobs:
 
   preview:
     runs-on: ubuntu-latest
+    environment: Test
     needs: validate
     steps:
     - uses: actions/checkout@v3
