@@ -1,19 +1,18 @@
-name: Vnets-UKS and UKW
-concurrency: vwan-uks
+name: Deploy-Vnets
+concurrency: Vnets
 
 on:
   push:
     branches:
       - main
-    
 
 permissions:
   id-token: write
   contents: read
 
 env:
-  AZURE_RESOURCEGROUP_NAME: rg-BicepModuleTesting
-  ENVIRONMENT_TYPE: Production
+  AZURE_RESOURCEGROUP_NAME: rg-bicepvalidate
+  
 
 jobs:
   lint:
@@ -21,11 +20,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Run Bicep linter
-      run: az bicep build --file ../TestEnv/Modules/Vnet/Vnet.bicep
-
+      run: az bicep build --file deploy/main.bicep
   validate:
     runs-on: ubuntu-latest
-    needs: lint
     steps:
     - uses: actions/checkout@v3
     - uses: azure/login@v1
@@ -37,16 +34,15 @@ jobs:
     - uses: azure/arm-deploy@v1
       name: Run preflight validation
       with:
-        scope: resourcegroup
         deploymentName: ${{ github.run_number }}
         resourceGroupName: ${{ env.AZURE_RESOURCEGROUP_NAME }}
-        template: ./Vwan/Vnet.bicep
-        parameters: ./Vwan/UKS/vnet.param.uks.json
+        template: TestEnv/Modules/Vnet/Vnet.bicep
+        parameters: TestEnv/UKS/vnet.param.uks.json
         deploymentMode: Validate
 
   preview:
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [lint, validate]
     steps:
     - uses: actions/checkout@v3
     - uses: azure/login@v1
@@ -58,16 +54,18 @@ jobs:
     - uses: azure/arm-deploy@v1
       name: Run what-if
       with:
-        scope: resourcegroup
         failOnStdErr: false
         resourceGroupName: ${{ env.AZURE_RESOURCEGROUP_NAME }}
-        template: ./Vwan/Vnet.bicep
-        parameters: ./Vwan/UKS/vnet.param.uks.json
+        template: TestEnv/Modules/Vnet/Vnet.bicep
+        parameters: TestEnv/UKS/vnet.param.uks.json
         additionalArguments: --what-if
 
-  deploy-Vwan:
+  deploy:
     runs-on: ubuntu-latest
+    environment: Test
     needs: preview
+    outputs:
+      appServiceAppHostName: ${{ steps.deploy.outputs.appServiceAppHostName }}
     steps:
     - uses: actions/checkout@v3
     - uses: azure/login@v1
@@ -77,58 +75,11 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     - uses: azure/arm-deploy@v1
-      id: deploy-Vwan
-      name: Deploy Vwan
+      id: deploy
+      name: Deploy website
       with:
-        scope: resourcegroup
         failOnStdErr: false
         deploymentName: ${{ github.run_number }}
         resourceGroupName: ${{ env.AZURE_RESOURCEGROUP_NAME }}
-        template: ./Vwan/Vnet.bicep
-        parameters: ./Vwan/UKS/vnet.param.uks.json
-  
-  deploy-Vhub-uks:
-    runs-on: ubuntu-latest
-    needs: deploy-Vwan
-    steps:
-    - uses: actions/checkout@v3
-    - uses: azure/login@v1
-      name: Sign in to Azure
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    - uses: azure/arm-deploy@v1
-      id: deploy-Vhub-uks
-      name: Deploy Vhub UKS
-      with:
-              scope: resourcegroup
-              failOnStdErr: false
-              deploymentName: ${{ github.run_number }}
-              resourceGroupName: ${{ env.AZURE_RESOURCEGROUP_NAME }}
-              template: ./Vwan/Vnet.bicep
-              parameters: ./Vwan/UKS/vnet.param.uks.json
-  
-  deploy-Vhub-ukw:
-    runs-on: ubuntu-latest
-    needs: deploy-Vhub-uks
-    steps:
-    - uses: actions/checkout@v3
-    - uses: azure/login@v1
-      name: Sign in to Azure
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    - uses: azure/arm-deploy@v1
-      id: deploy-Vhub-ukw
-      name: Deploy Vhub UKW
-      with:
-              scope: resourcegroup
-              failOnStdErr: false
-              deploymentName: ${{ github.run_number }}
-              resourceGroupName: ${{ env.AZURE_RESOURCEGROUP_NAME }}
-              template: ./Vwan/Vnet.bicep
-              parameters: ./Vwan/UKS/vnet.param.uks.json
-      
-        
+        template: TestEnv/Modules/Vnet/Vnet.bicep
+        parameters: TestEnv/UKS/vnet.param.uks.json
