@@ -12,6 +12,7 @@ permissions:
 
 env:
   AZURE_RESOURCEGROUP_NAME: rg-bicepvalidate
+  ENVIRONMENT_TYPE: Test
   
 
 jobs:
