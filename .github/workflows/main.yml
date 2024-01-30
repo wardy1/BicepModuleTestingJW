@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Run Bicep linter
-      run: az bicep build --file TestEnv/UKS/vnet.param.uks.json
+      run: az bicep build --file TestEnv/Modules/Vnet/Vnet.bicep
 
   validate:
     needs: lint
